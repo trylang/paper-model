@@ -122,11 +122,15 @@ import lightgbm as lgb
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import KFold, cross_val_score
 from sklearn.metrics import confusion_matrix, recall_score, classification_report
-from sklearn.model_selection import cross_val_predict
+from sklearn.model_selection import cross_val_predict, TimeSeriesSplit, cross_validate
 
 from keras.models import Sequential
 from keras.layers import LSTM, Dense
-from keras.wrappers.scikit_learn import KerasRegressor
+from sklearn.base import BaseEstimator, RegressorMixin
+from scikeras.wrappers import KerasRegressor
+from sklearn.metrics import make_scorer, mean_squared_error
+import statsmodels.api as sm
+from lightgbm import LGBMRegressor
 
 # 设置随机种子
 SEED = 2018
@@ -139,26 +143,26 @@ df_X = scale(df_X, axis=0)  # 将数据转化为标准数据
 # 构建模型
 lr = LogisticRegression(random_state=SEED, tol=1e-6)  # 逻辑回归模型
 
+# # 创建ARIMA模型
+# class ARIMAWrap(BaseEstimator, RegressorMixin):
+#     def __init__(self, order=(5, 1, 0)):
+#         self.order = order
+#
+#     def fit(self, X, y):
+#         self.model = ARIMA(y, order=self.order)
+#         self.fitted_model = self.model.fit()
+#         return self
+#
+#     def predict(self, X):
+#         # 在这里，你可以根据需要指定如何进行预测
+#         # 这里假设 X 是测试数据，实际情况根据 ARIMA 模型的预测方法进行调整
+#         predictions = self.fitted_model.forecast(steps=len(X))
+#         return predictions
+#
+# # 创建 ARIMAWrap 实例
+# arima = ARIMAWrap(order=(5, 1, 0))
 
-# 创建ARIMA模型
-def arima(series, order=(5, 1, 0)):
-    return ARIMA(series, order=order)
 
-
-# 创建LSTM模型
-look_back = 1
-
-
-def build_lstm_model():
-    model = Sequential()
-    model.add(LSTM(4, input_shape=(1, look_back)))
-    model.add(Dense(1))
-    model.compile(loss='mean_squared_error', optimizer='adam')
-    return model
-
-
-# 使用KerasRegressor包装LSTM模型
-lstm = KerasRegressor(build_fn=build_lstm_model, epochs=100, batch_size=1, verbose=0)
 
 svm = SVC(probability=True, random_state=SEED, tol=1e-6)  # SVM模型
 
@@ -171,40 +175,57 @@ Xgbc = XGBClassifier(random_state=SEED)  # Xgbc
 gbm = lgb.LGBMClassifier(random_state=SEED)  # lgb
 
 
-def muti_score(model, X, y, cv):
-    warnings.filterwarnings('ignore')
-
-    if model == 'arima':
-        accuracy = cross_val_score(model(y), y, scoring='accuracy', cv=cv)
-        precision = cross_val_score(model(y),  y, scoring='precision', cv=cv)
-        recall = cross_val_score(model(y),  y, scoring='recall', cv=cv)
-        f1_score = cross_val_score(model(y),  y, scoring='f1', cv=cv)
-        auc = cross_val_score(model(y),  y, scoring='roc_auc', cv=cv)
-    else:
-
-        accuracy = cross_val_score(model, X, y, scoring='accuracy', cv=cv)
-        precision = cross_val_score(model, X, y, scoring='precision', cv=cv)
-        recall = cross_val_score(model, X, y, scoring='recall', cv=cv)
-        f1_score = cross_val_score(model, X, y, scoring='f1', cv=cv)
-        auc = cross_val_score(model, X, y, scoring='roc_auc', cv=cv)
-    print("准确率:", accuracy.mean())
-    print("精确率:", precision.mean())
-    print("召回率:", recall.mean())
-    print("F1_score:", f1_score.mean())
-    print("AUC:", auc.mean())
+# 定义计算 RMSE 的自定义评估函数
+def rmse(y_true, y_pred):
+    return np.sqrt(mean_squared_error(y_true, y_pred))
 
 
-model_name = ["lr", "arima", "lstm"]
+# 使用 cross_val_predict 进行交叉验证预测
+# predicted_arima = cross_val_predict(arima, X_train_undersample, y_train_undersample, cv=5)
+
+# # 使用自定义评估函数计算 RMSE
+# rmse_score_arima = rmse(y_train_undersample, predicted_arima)
+# rmse_score_lstm = rmse(y_train_undersample, predicted_lstm)
+
+
+# model_names = ["arima", "lstm"]
 # model_name = ["lr", "arima", "lstm", "svm", "forest", "Gbdt", "Xgbc", "gbm"]
 
+# 创建一个评分函数，使用均方根误差(RMSE)
+def rmse(y_true, y_pred):
+    return np.sqrt(mean_squared_error(y_true, y_pred))
+
+# 创建TimeSeriesSplit交叉验证生成器
+tscv = TimeSeriesSplit(n_splits=5)
+
+# 设置LSTM模型参数
+lstm = Sequential()
+lstm.add(LSTM(units=100, input_shape=(X_test_undersample.shape[1], X_test_undersample.shape[2])))
+lstm.add(Dense(1))
+lstm.compile(loss='mean_squared_error', optimizer='adam')
+
+# 设置ARIMA模型参数
+arima = ARIMA(y_test_undersample, order=(5,1,0))
+
+# 设置LightGBM模型参数
+lgbm = LGBMRegressor(num_leaves=31, learning_rate=0.1, n_estimators=100)
 
 
-# 先暂停五折评分的运行
-for name in model_name:
-    model = eval(name)
-    print(name)
-    muti_score(model, X_train_undersample, y_train_undersample, 5)
 
+# 使用 cross_val_predict 进行交叉验证预测
+lstm_y_pred = cross_val_predict(estimator=lstm, X=X_test_undersample, y=y_test_undersample, cv=tscv)
+arima_y_pred = cross_val_predict(estimator=arima, X=X_test_undersample, y=y_test_undersample, cv=tscv)
+lgbm_y_pred = cross_val_predict(estimator=lgbm, X=X_test_undersample, y=y_test_undersample, cv=tscv)
+
+# 使用自定义的评分函数计算评分
+lstm_score = rmse(y_test_undersample, lstm_y_pred)
+arima_score = rmse(y_test_undersample, arima_y_pred)
+lgbm_score = rmse(y_test_undersample, lgbm_y_pred)
+
+# 打印评分
+print('RMSE for LSTM:', lstm_score)
+print('RMSE for ARIMA:', arima_score)
+print('RMSE for LightGBM:', lgbm_score)
 
 # 退出程序，状态码为0（表示正常退出）
 sys.exit()
@@ -419,7 +440,7 @@ plt.show()
 # 因此，GridSearchCV 使用了交叉验证来评估每个参数组合的性能，并找到最佳参数和相应的评分。在代码中，我们使用了 scoring='accuracy' 来评估模型性能，但你可以根据实际情况选择适合你问题的评分指标。
 
 from sklearn.model_selection import GridSearchCV
-from sklearn.metrics import make_scorer, roc_auc_score
+from sklearn.metrics import make_scorer, roc_auc_score, mean_squared_error
 
 # 1. N-Sigma模型的参数选择
 # 对于N-Sigma模型，参数通常是事先设定的，例如标准差的倍数等
