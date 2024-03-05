@@ -3,10 +3,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import warnings
 import sys
+from sklearn.model_selection import train_test_split
 
 warnings.filterwarnings('ignore')
 
-data = pd.read_csv("./data/creditcard_327.csv")
+data = pd.read_csv("../data/creditcard_327.csv")
 data.head()
 
 # 数据标签分布
@@ -66,3 +67,30 @@ def X_Y_undersample():
 
     return X, y, X_undersample, y_undersample, under_sample_data
 
+
+
+
+# 数据集划分
+def primary_data_split():
+    X, y, X_undersample, y_undersample, under_sample_data = X_Y_undersample()
+
+    # 整个数据集进行划分
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=0)
+    # print("原始训练集包含样本数量: ", len(X_train))
+    # print("原始测试集包含样本数量: ", len(X_test))
+    # print("原始样本总数: ", len(X_train)+len(X_test))
+    return X_train, X_test, y_train, y_test
+
+def under_sample_split():
+    X, y, X_undersample, y_undersample, under_sample_data = X_Y_undersample()
+
+    # 下采样数据集进行划分
+    X_train_undersample, X_test_undersample, y_train_undersample, y_test_undersample = train_test_split(X_undersample
+                                                                                                        , y_undersample
+                                                                                                        , test_size=0.3
+                                                                                                        ,random_state=0)
+    # print("")
+    # print("下采样训练集包含样本数量: ", len(X_train_undersample))
+    # print("下采样测试集包含样本数量: ", len(X_test_undersample))
+    # print("下采样样本总数: ", len(X_train_undersample)+len(X_test_undersample))
+    return X_train_undersample, X_test_undersample, y_train_undersample, y_test_undersample

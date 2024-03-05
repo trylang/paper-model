@@ -13,33 +13,13 @@ import numpy as np
 import warnings
 import sys
 
-from module.undersample_value import X_Y_undersample
+from module.undersample_value import under_sample_split
 
 warnings.filterwarnings('ignore')
 
 ################   1- 下采样数据  +++++++++++++++++++++++++
-X, y, X_undersample, y_undersample, under_sample_data = X_Y_undersample()
+X_train_undersample, X_test_undersample, y_train_undersample, y_test_undersample = under_sample_split()
 
-
-# 数据集划分
-from sklearn.model_selection import train_test_split
-
-# 整个数据集进行划分
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=0)
-
-# print("原始训练集包含样本数量: ", len(X_train))
-# print("原始测试集包含样本数量: ", len(X_test))
-# print("原始样本总数: ", len(X_train)+len(X_test))
-
-# 下采样数据集进行划分
-X_train_undersample, X_test_undersample, y_train_undersample, y_test_undersample = train_test_split(X_undersample
-                                                                                                    , y_undersample
-                                                                                                    , test_size=0.3
-                                                                                                    , random_state=0)
-# print("")
-# print("下采样训练集包含样本数量: ", len(X_train_undersample))
-# print("下采样测试集包含样本数量: ", len(X_test_undersample))
-# print("下采样样本总数: ", len(X_train_undersample)+len(X_test_undersample))
 
 
 ########################   预测模型最佳选取    ######################################
