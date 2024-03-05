@@ -3,11 +3,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import warnings
 import sys
+import os
 from sklearn.model_selection import train_test_split
 
 warnings.filterwarnings('ignore')
 
 data = pd.read_csv("../data/creditcard_327.csv")
+print(222, print(os.path.abspath('../data/creditcard_327.csv')))
 data.head()
 
 # 数据标签分布
