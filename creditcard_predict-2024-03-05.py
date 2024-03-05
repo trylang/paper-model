@@ -13,65 +13,13 @@ import numpy as np
 import warnings
 import sys
 
+from module.undersample_value import X_Y_undersample
+
 warnings.filterwarnings('ignore')
 
-data = pd.read_csv("./data/creditcard_327.csv")
-data.head()
+################   1- 下采样数据  +++++++++++++++++++++++++
+X, y, X_undersample, y_undersample, under_sample_data = X_Y_undersample()
 
-# 数据标签分布
-count_classes = pd.Series(data['V2']).value_counts().sort_index()
-print(count_classes)
-
-# 论文叙述1： 异常样本相对正常样本很少 284315：492
-count_classes.plot(kind='bar')
-plt.title("Fraud class histogram")
-plt.xlabel("V2")
-plt.ylabel("Frequency")
-# plt.show()
-
-
-# 论文叙述2： 数据标准化处理
-from sklearn.preprocessing import StandardScaler
-
-data['normAmount'] = StandardScaler().fit_transform(data['Amount'].values.reshape(-1, 1))
-data = data.drop(['Time', 'Amount'], axis=1)
-print(data.head())
-
-
-# 下采样方案
-def X_Y_undersample(data):
-    X = data.iloc[:, data.columns != 'V2']
-    y = data.iloc[:, data.columns == 'V2']
-
-    # 得到所有异常样本的索引
-    number_records_fraud = len(data[(data.V2 > 1) | (data.V2 < -1)])
-    fraud_indices = np.array(data[(data.V2 > 1) | (data.V2 < -1)].index)
-
-    # 得到所有正常样本的索引
-    normal_indices = data[(data.V2 > -1) & (data.V2 < 1)].index
-
-    # 在正常样本中随机采样出指定个数的样本，并取其索引
-    random_normal_indices = np.random.choice(normal_indices, number_records_fraud, replace=False)
-    random_normal_indices = np.array(random_normal_indices)
-
-    # 有了正常和异常样本后把它们的索引都拿到手
-    under_sample_indices = np.concatenate([fraud_indices, random_normal_indices])
-
-    # 根据索引得到下采样所有样本点
-    under_sample_data = data.iloc[under_sample_indices, :]
-
-    X_undersample = under_sample_data.iloc[:, under_sample_data.columns != 'V2']
-    y_undersample = under_sample_data.iloc[:, under_sample_data.columns == 'V2']
-    return X, y, X_undersample, y_undersample, under_sample_data
-
-
-X, y, X_undersample, y_undersample, under_sample_data = X_Y_undersample(data)
-# 下采样 样本比例
-print("正常样本所占整体比例: ",
-      len(under_sample_data[(under_sample_data.V2 > -1) & (under_sample_data.V2 < 1)]) / len(under_sample_data))
-print("异常样本所占整体比例: ",
-      len(under_sample_data[(under_sample_data.V2 < -1) | (under_sample_data.V2 > 1)]) / len(under_sample_data))
-print("下采样策略总体样本数量: ", len(under_sample_data))
 
 # 数据集划分
 from sklearn.model_selection import train_test_split
@@ -143,20 +91,11 @@ from tensorflow.keras.regularizers import L1L2
 # 设置随机种子
 SEED = 2018
 
-df_X = data.iloc[:, data.columns != 'V2']
-df_y = data.iloc[:, data.columns == 'V2']
-
-df_X = scale(df_X, axis=0)  # 将数据转化为标准数据
-
 # 构建模型
 lr = LogisticRegression(random_state=SEED, tol=1e-6)  # 逻辑回归模型
 
 
 ##################   创建预测模型  ++++++++++++++++++
-
-print(11, np.shape(X_test_undersample), type(X_test_undersample))
-print(22, np.shape(y_test_undersample), type(y_test_undersample))
-
 
 # 设置 K-Fold 时间序列交叉验证
 tscv = TimeSeriesSplit(n_splits=5)
@@ -164,50 +103,50 @@ tscv = TimeSeriesSplit(n_splits=5)
 # 初始化评分记录器
 scores = {'LSTM': [], 'ARIMA': [], 'LightGBM': []}
 
-# # LSTM和ARIMA模型通常要求序列数据作为输入，所以确保这些前提条件
-# for train_index, test_index in tscv.split(X_test_undersample):
-#     # 分割数据集
-#     X_train, X_test = X_test_undersample.iloc[train_index], X_test_undersample.iloc[test_index]
-#     y_train, y_test = y_test_undersample.iloc[train_index], y_test_undersample.iloc[test_index]
-#
-#     # LSTM模型
-#     # 重造数据以符合LSTM的输入需求: [samples, time steps, features]
-#     X_train_lstm = X_train.values.reshape((X_train.shape[0], 1, X_train.shape[1]))
-#     X_test_lstm = X_test.values.reshape((X_test.shape[0], 1, X_test.shape[1]))
-#
-#     lstm_model = Sequential([
-#         LSTM(50, activation='relu', input_shape=(X_train_lstm.shape[1], X_train_lstm.shape[2])),
-#         Dense(1)
-#     ])
-#     lstm_model.compile(optimizer='adam', loss='mean_squared_error')
-#     lstm_model.fit(X_train_lstm, y_train, epochs=20, verbose=0)
-#     y_pred_lstm = lstm_model.predict(X_test_lstm)
-#
-#     scores['LSTM'].append({'MAPE': mean_absolute_percentage_error(y_test, y_pred_lstm),
-#                            'MSE': mean_squared_error(y_test, y_pred_lstm)})
-#
-#     # ARIMA模型（请根据您的具体数据调整模型参数）
-#     arima_model = ARIMA(y_train, order=(5, 1, 0))  # 这里的(5,1,0)是(p,d,q)参数的示例
-#     arima_model_fit = arima_model.fit()
-#     y_pred_arima = arima_model_fit.forecast(steps=len(y_test))
-#
-#     scores['ARIMA'].append({'MAPE': mean_absolute_percentage_error(y_test, y_pred_arima),
-#                             'MSE': mean_squared_error(y_test, y_pred_arima)})
-#
-#     # LightGBM模型
-#     lgbm_model = LGBMRegressor(n_estimators=100)
-#     lgbm_model.fit(X_train, y_train)
-#     y_pred_lgbm = lgbm_model.predict(X_test)
-#
-#     scores['LightGBM'].append({'MAPE': mean_absolute_percentage_error(y_test, y_pred_lgbm),
-#                                'MSE': mean_squared_error(y_test, y_pred_lgbm)})
-#
-#
-# for model_name, score_list in scores.items():
-#     mape_scores = [score['MAPE'] for score in score_list]
-#     mse_scores = [score['MSE'] for score in score_list]
-#     print(f"{model_name} MAPE: {np.mean(mape_scores):.4f}")
-#     print(f"{model_name} MSE: {np.mean(mse_scores):.4f}")
+# LSTM和ARIMA模型通常要求序列数据作为输入，所以确保这些前提条件
+for train_index, test_index in tscv.split(X_test_undersample):
+    # 分割数据集
+    X_train, X_test = X_test_undersample.iloc[train_index], X_test_undersample.iloc[test_index]
+    y_train, y_test = y_test_undersample.iloc[train_index], y_test_undersample.iloc[test_index]
+
+    # LSTM模型
+    # 重造数据以符合LSTM的输入需求: [samples, time steps, features]
+    X_train_lstm = X_train.values.reshape((X_train.shape[0], 1, X_train.shape[1]))
+    X_test_lstm = X_test.values.reshape((X_test.shape[0], 1, X_test.shape[1]))
+
+    lstm_model = Sequential([
+        LSTM(50, activation='relu', input_shape=(X_train_lstm.shape[1], X_train_lstm.shape[2])),
+        Dense(1)
+    ])
+    lstm_model.compile(optimizer='adam', loss='mean_squared_error')
+    lstm_model.fit(X_train_lstm, y_train, epochs=20, verbose=0)
+    y_pred_lstm = lstm_model.predict(X_test_lstm)
+
+    scores['LSTM'].append({'MAPE': mean_absolute_percentage_error(y_test, y_pred_lstm),
+                           'MSE': mean_squared_error(y_test, y_pred_lstm)})
+
+    # ARIMA模型（请根据您的具体数据调整模型参数）
+    arima_model = ARIMA(y_train, order=(5, 1, 0))  # 这里的(5,1,0)是(p,d,q)参数的示例
+    arima_model_fit = arima_model.fit()
+    y_pred_arima = arima_model_fit.forecast(steps=len(y_test))
+
+    scores['ARIMA'].append({'MAPE': mean_absolute_percentage_error(y_test, y_pred_arima),
+                            'MSE': mean_squared_error(y_test, y_pred_arima)})
+
+    # LightGBM模型
+    lgbm_model = LGBMRegressor(n_estimators=100)
+    lgbm_model.fit(X_train, y_train)
+    y_pred_lgbm = lgbm_model.predict(X_test)
+
+    scores['LightGBM'].append({'MAPE': mean_absolute_percentage_error(y_test, y_pred_lgbm),
+                               'MSE': mean_squared_error(y_test, y_pred_lgbm)})
+
+
+for model_name, score_list in scores.items():
+    mape_scores = [score['MAPE'] for score in score_list]
+    mse_scores = [score['MSE'] for score in score_list]
+    print(f"{model_name} MAPE: {np.mean(mape_scores):.4f}")
+    print(f"{model_name} MSE: {np.mean(mse_scores):.4f}")
 
 #   选取LSTM进行预测
 # LSTM MAPE: 0.9669
@@ -216,7 +155,6 @@ scores = {'LSTM': [], 'ARIMA': [], 'LightGBM': []}
 # ARIMA MSE: 2.6676
 # LightGBM MAPE: 1.4516
 # LightGBM MSE: 2.4651
-
 
 
 #################  使用LSTM 预测 ，并计算绝对值+++++++++++++++
