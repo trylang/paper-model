@@ -128,3 +128,37 @@ for pair in feature_importances:
 # Variable: V26                  Importance: 0.0
 # Variable: V27                  Importance: 0.0
 # Variable: Class                Importance: 0.0
+
+#################   绘图TOP15 ++++++++++++++++++++++
+
+# 假设 feature_importances 是一个包含特征名和对应重要性的列表
+# feature_importances = [('feature1', 0.2), ('feature2', 0.5), ...]
+
+# 对特征重要性进行倒序排序
+feature_importances = sorted(feature_importances, key=lambda x: x[1], reverse=True)
+
+# 提取特征名称和重要性
+features = [pair[0] for pair in feature_importances]
+importances = [pair[1] for pair in feature_importances]
+
+# 设置颜色映射，这里使用 'rainbow' 映射，颜色更加艳丽
+colors = plt.cm.rainbow(np.linspace(0, 1, len(features)))
+
+# 设置条形图的宽度
+bar_width = 0.8
+
+# 绘制横向条形图
+plt.figure(figsize=(10, 12))  # 可以调整图形大小
+plt.barh(range(len(features))[::-1], importances, color=colors, height=bar_width, align='center')
+
+# 添加标题和标签
+plt.title('Feature Importances (Descending)')
+plt.xlabel('Importance')
+plt.yticks(range(len(features))[::-1], [f for f, _ in feature_importances])  # 倒序显示特征名称
+
+# 设置条形图之间的间距
+plt.subplots_adjust(left=0.35)  # 增加左侧空白区域
+
+# 显示图形
+plt.tight_layout()
+plt.show()
