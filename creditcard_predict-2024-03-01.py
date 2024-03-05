@@ -6,6 +6,7 @@
 # @File :creditcard_predict.py
 # @software :
 # 修改creditcard_predict.py 文件中 将预测指标Class 换为V2
+# 完整全套代码
 
 import pandas as pd
 import matplotlib.pyplot as plt

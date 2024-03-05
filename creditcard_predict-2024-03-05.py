@@ -5,7 +5,7 @@
 # @Site :
 # @File :creditcard_predict.py
 # @software :
-# 完成LSTM最佳4个参数，并计算预测值和差值绝对值
+# 完成LSTM最佳8个参数，并计算预测值和差值绝对值
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -138,6 +138,7 @@ from sklearn.model_selection import ParameterGrid
 import tensorflow as tf
 from scipy.stats import randint as sp_randint
 from sklearn.model_selection import ParameterSampler
+from tensorflow.keras.regularizers import L1L2
 
 # 设置随机种子
 SEED = 2018
@@ -230,9 +231,23 @@ X_test_3D = X_test_undersample.values.reshape(X_test_undersample.shape[0], 1, X_
 y_test_values = y_test_undersample.values  # 将DataFrame转换为numpy数组
 
 # 定义创建 LSTM 模型的函数
-def create_lstm_model(units=50, dropout=0.0, recurrent_dropout=0.0, optimizer='adam'):
+def create_lstm_model(units=50, dropout=0.0, recurrent_dropout=0.0, optimizer='adam', activation='tanh', recurrent_activation='sigmoid'
+                      # return_sequences=False,
+                      # stateful=False
+                      , recurrent_regularizer=None, kernel_regularizer=None, bias_regularizer=None):
+
     model = Sequential()
-    model.add(LSTM(units, dropout=dropout, recurrent_dropout=recurrent_dropout, input_shape=(X_test_3D.shape[1], X_test_3D.shape[2])))
+    model.add(LSTM(units,
+                   dropout=dropout,
+                   recurrent_dropout=recurrent_dropout,
+                   activation=activation,
+                   recurrent_activation=recurrent_activation,
+                   # return_sequences=return_sequences,
+                   # stateful=stateful,
+                   recurrent_regularizer=recurrent_regularizer,
+                   kernel_regularizer=kernel_regularizer,
+                   bias_regularizer=bias_regularizer,
+                   input_shape=(X_test_3D.shape[1], X_test_3D.shape[2])))
     model.add(Dense(1))
     if optimizer == 'adam':
         opt = Adam()
@@ -247,13 +262,19 @@ def custom_scorer(y_true, y_pred):
     return -mean_squared_error(y_true, y_pred)  # negated mean squared error for optimization
 
 # 定义参数空间
+# 这里：return_sequences 和 stateful 放开参数会报错，顾在此只使用这8个参数
 param_grid = {
-    'units': sp_randint(50, 200),  # LSTM units
-    'dropout': [0.1, 0.2, 0.3, 0.4],  # dropout values
-    # 'learning_rate': [0.001, 0.01, 0.1],  # learning rate values
-    "recurrent_dropout": [0.0, 0.1, 0.2],  # 添加 recurrent_dropout 参数
-    # 'batch_size': [16, 32, 64],  # batch size values
-    'optimizer': ['adam', 'rmsprop']  # optimizer choices
+    'units': [50, 100, 150],  # LSTM 单元数量
+    'dropout': [0.0, 0.1, 0.2],  # dropout 比例
+    'recurrent_dropout': [0.0, 0.1, 0.2],  # recurrent_dropout 比例
+    'activation': ['relu', 'tanh'],  # 激活函数类型
+    'recurrent_activation': ['sigmoid', 'tanh'],  # recurrent 激活函数类型
+    # 'return_sequences': [True, False],  # 是否返回全部序列
+    # 'stateful': [True, False],  # 是否为 stateful LSTM
+    # 其他正则化参数根据需要增加，这里简化为 None
+    'recurrent_regularizer': [None, L1L2(l1=0.01, l2=0.01)],
+    'kernel_regularizer': [None, L1L2(l1=0.01, l2=0.01)],
+    'bias_regularizer': [None, L1L2(l1=0.01, l2=0.01)]
 }
 
 # 设置初始的最佳分数和最佳参数
@@ -263,13 +284,28 @@ best_params = {}
 param_list = list(ParameterSampler(param_grid, n_iter=10, random_state=42))  # 从参数网格中随机抽样 10 个参数组合
 
 for params in param_list:
-    print(params, 111)
+
     units = params['units']
     dropout = params['dropout']
     recurrent_dropout = params['recurrent_dropout']
-    optimizer = params['optimizer']
+    activation = params['activation']
 
-    model = create_lstm_model(units=units, dropout=dropout, recurrent_dropout=recurrent_dropout, optimizer=optimizer)
+    recurrent_activation = params['recurrent_activation']
+    # return_sequences = params['return_sequences']
+    # stateful = params['stateful']
+    recurrent_regularizer = params['recurrent_regularizer']
+
+    kernel_regularizer = params['kernel_regularizer']
+    bias_regularizer = params['bias_regularizer']
+
+
+    model = create_lstm_model(units=units, dropout=dropout, recurrent_dropout=recurrent_dropout,
+                              activation=activation, recurrent_activation=recurrent_activation,
+                      # return_sequences=return_sequences
+    # stateful=stateful
+                            recurrent_regularizer=recurrent_regularizer,
+                      kernel_regularizer=kernel_regularizer, bias_regularizer=bias_regularizer)
+
     model.fit(X_test_3D, y_test_values, epochs=10, batch_size=32, verbose=0)
 
     # 计算模型预测值并计算均方误差

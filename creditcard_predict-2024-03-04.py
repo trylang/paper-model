@@ -5,7 +5,7 @@
 # @Site :
 # @File :creditcard_predict.py
 # @software :
-# 修改creditcard_predict.py 文件中 将预测指标Class 换为V2
+# 完成LSTM最佳2个参数，并计算预测值和差值绝对值
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -276,7 +276,7 @@ for params in param_list:
 print("Best parameters: ", best_params)
 print("Best score: ", best_score)
 
-# 使用最佳参数构建 LSTM 模型
+#################### 使用最佳参数构建 LSTM 模型 预测，并计算绝对值 +++++++++++++++++++++++
 best_units = 150  # 假设最佳单位数为150
 best_optimizer = 'adam'  # 假设最佳优化器为adam
 
