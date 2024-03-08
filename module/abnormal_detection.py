@@ -14,6 +14,11 @@ import numpy as np
 import warnings
 import sys
 
+from sklearn.svm import OneClassSVM
+from sklearn.ensemble import IsolationForest
+from sklearn.neighbors import LocalOutlierFactor
+
+
 from module.undersample_value import under_sample_split
 
 from module.best_pridict_model import abs_predict
@@ -28,50 +33,98 @@ X_train_undersample, X_test_undersample, y_train_undersample, y_test_undersample
 
 abs_difference = abs_predict()
 
-############## N-Sigma方法
-# N-Sigma 方法通常用于基于数据的正态分布进行异常检测。在这种方法中，我们计算数据的均值和标准差，然后使用一定的倍数（通常是3或者6倍）标准差来定义正常值的范围，超出这个范围的数据被认为是异常值。
-# 假设 abs_difference 是你的绝对差异数据
-abs_difference = abs_difference.values.reshape(-1, 1)
-mean = np.mean(abs_difference)
-std = np.std(abs_difference)
+######################   构建模型  +++++++++++++++++++++++++++++++
 
-# 定义 N 倍标准差
-n_sigma = 3
-threshold = mean + n_sigma * std
+def fit_predict(abs_difference):
+    ############## N-Sigma方法
+    # N-Sigma 方法通常用于基于数据的正态分布进行异常检测。在这种方法中，我们计算数据的均值和标准差，然后使用一定的倍数（通常是3或者6倍）标准差来定义正常值的范围，超出这个范围的数据被认为是异常值。
+    # 假设 abs_difference 是你的绝对差异数据
+    abs_difference = abs_difference.values.reshape(-1, 1)
+    mean = np.mean(abs_difference)
+    std = np.std(abs_difference)
 
-# 标记异常值
-outliers_ns = (abs_difference > threshold)
+    # 定义 N 倍标准差
+    n_sigma = 3
+    threshold = mean + n_sigma * std
 
-############## One-Class SVM
-# One-Class SVM 是一种无监督学习算法，它试图学习数据的特征，并将其特征空间划分为正常和异常区域。
+    # 标记异常值
+    outliers_ns = (abs_difference > threshold)
 
-from sklearn.svm import OneClassSVM
+    ############## One-Class SVM
+    # One-Class SVM 是一种无监督学习算法，它试图学习数据的特征，并将其特征空间划分为正常和异常区域。
 
-# 创建 One-Class SVM 模型并拟合数据
-model_one_class_svm = OneClassSVM(nu=0.01)  # nu 是一个超参数，用于控制异常点的比例
-model_one_class_svm.fit(abs_difference.reshape(-1, 1))
 
-# 预测数据点的标签（1表示正常，-1表示异常）
-outliers_one_class_svm = model_one_class_svm.predict(abs_difference.reshape(-1, 1))
 
-############## Isolation Forest
-# 隔离森林是一种基于树的集成算法，它通过将数据逐渐分割为单独的区域来识别异常点。
+    # 创建 One-Class SVM 模型并拟合数据
+    model_one_class_svm = OneClassSVM(nu=0.01)  # nu 是一个超参数，用于控制异常点的比例
+    model_one_class_svm.fit(abs_difference.reshape(-1, 1))
 
-from sklearn.ensemble import IsolationForest
+    # 预测数据点的标签（1表示正常，-1表示异常）
+    outliers_one_class_svm = model_one_class_svm.predict(abs_difference.reshape(-1, 1))
 
-# 创建 Isolation Forest 模型并拟合数据
-model_isolation_forest = IsolationForest(contamination=0.01)  # contamination 用于控制异常点的比例
-model_isolation_forest.fit(abs_difference.reshape(-1, 1))
+    ############## Isolation Forest
+    # 隔离森林是一种基于树的集成算法，它通过将数据逐渐分割为单独的区域来识别异常点。
 
-# 预测数据点的标签（1表示正常，-1表示异常）
-outliers_isolation_forest = model_isolation_forest.predict(abs_difference.reshape(-1, 1))
 
-############## LOF (局部异常因子)
-from sklearn.neighbors import LocalOutlierFactor
 
-# 创建 LOF 模型并拟合数据
-model_lof = LocalOutlierFactor(contamination=0.01)  # contamination 控制异常点的比例
-outliers_lof = model_lof.fit_predict(abs_difference.reshape(-1, 1))
+    # 创建 Isolation Forest 模型并拟合数据
+    model_isolation_forest = IsolationForest(contamination=0.01)  # contamination 用于控制异常点的比例
+    model_isolation_forest.fit(abs_difference.reshape(-1, 1))
+
+    # 预测数据点的标签（1表示正常，-1表示异常）
+    outliers_isolation_forest = model_isolation_forest.predict(abs_difference.reshape(-1, 1))
+
+    ############## LOF (局部异常因子)
+
+
+    # 创建 LOF 模型并拟合数据
+    model_lof = LocalOutlierFactor(contamination=0.01)  # contamination 控制异常点的比例
+    outliers_lof = model_lof.fit_predict(abs_difference.reshape(-1, 1))
+
+fit_predict(abs_difference)
+
+
+def fit_predict2(abs_difference):
+    # 假设 abs_difference 是您的绝对差异数据的时间序列
+    # 将 abs_difference 转换为 pandas 的 DataFrame，并设置时间索引
+    abs_difference = pd.Series(abs_difference)
+
+    # N-Sigma 方法
+    mean = abs_difference.mean()
+    std = abs_difference.std()
+
+    # 根据均值和标准差定义异常阈值
+    n_sigma = 3
+    threshold = mean + n_sigma * std
+
+    # 标记异常值
+    outliers_ns = abs_difference[abs_difference > threshold]
+
+    # One-Class SVM
+    model_one_class_svm = OneClassSVM(nu=0.01)  # nu 是一个超参数，用于控制异常点的比例
+    outliers_one_class_svm = model_one_class_svm.fit_predict(abs_difference.values.reshape(-1, 1))
+    # 统计异常值数量
+    num_outliers_one_class_svm = sum(outliers_one_class_svm == -1)
+
+    # Isolation Forest
+    model_isolation_forest = IsolationForest(contamination=0.01)  # contamination 用于控制异常点的比例
+    outliers_isolation_forest = model_isolation_forest.fit_predict(abs_difference.values.reshape(-1, 1))
+    # 统计异常值数量
+    num_outliers_isolation_forest = sum(outliers_isolation_forest == -1)
+
+    # LOF
+    model_lof = LocalOutlierFactor(contamination=0.01)  # contamination 控制异常点的比例
+    outliers_lof = model_lof.fit_predict(abs_difference.values.reshape(-1, 1))
+    # 统计异常值数量
+    num_outliers_lof = sum(outliers_lof == -1)
+
+
+fit_predict2(abs_difference)
+
+
+sys.exit()
+
+
 
 ############## 绘图观察上述四种模型 ################
 # 绘制绝对差异数据的直方图
