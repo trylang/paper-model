@@ -250,29 +250,36 @@ best_optimizer = 'adam'  # 假设最佳优化器为adam
 X_test_3D = X_test_undersample.values.reshape(X_test_undersample.shape[0], 1, X_test_undersample.shape[1])
 y_test_values = y_test_undersample.values  # 将DataFrame转换为numpy数组
 
-model = Sequential()
-model.add(LSTM(best_units, input_shape=(X_test_3D.shape[1], X_test_3D.shape[2])))
-model.add(Dense(1))
+def abs_predict():
+    model = Sequential()
+    model.add(LSTM(best_units, input_shape=(X_test_3D.shape[1], X_test_3D.shape[2])))
+    model.add(Dense(1))
 
-if best_optimizer == 'adam':
-    opt = Adam()
-else:
-    opt = RMSprop()
+    if best_optimizer == 'adam':
+        opt = Adam()
+    else:
+        opt = RMSprop()
 
-model.compile(loss='mean_squared_error', optimizer=opt)
+    model.compile(loss='mean_squared_error', optimizer=opt)
 
-# 在整个数据集上训练模型
-model.fit(X_test_3D, y_test_values, epochs=10, batch_size=32, verbose=0)
+    # 在整个数据集上训练模型
+    model.fit(X_test_3D, y_test_values, epochs=10, batch_size=32, verbose=0)
 
+    # 使用模型进行预测
+    predictions = model.predict(X_test_3D)
 
+    # 计算预测值和真实值之间的差值的绝对值
 
+    # 将单列 DataFrame 转换为 Series
+    y_test_undersample_series = y_test_undersample.iloc[:, 0]
 
-# 使用模型进行预测
-predictions = model.predict(X_test_3D)
+    ## 再计算V2 绝对差值
+    abs_difference = np.abs(predictions - y_test_undersample)
+    print(55, abs_difference)
 
-# 计算预测值和真实值之间的差值的绝对值
-absolute_errors = np.abs(predictions.flatten() - y_test_values)
+    # 输出预测值和差值
+    print("Predictions: ", predictions)
+    print("Absolute Errors: ", abs_difference)
 
-# 输出预测值和差值
-print("Predictions: ", predictions)
-print("Absolute Errors: ", absolute_errors)
+    return abs_difference
+
